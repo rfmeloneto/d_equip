@@ -219,6 +219,33 @@
   .tag-state { background: rgba(138,154,181,0.12); color: var(--text2); }
   .tag-ok { background: rgba(0,229,160,0.15); color: var(--accent); }
   .tag-pending { background: rgba(251,191,36,0.12); color: var(--warn); }
+  .tag-returned { background: rgba(255,77,109,0.12); color: var(--danger); }
+
+  .delegate-card.returned::before { background: var(--danger); }
+
+  .card-footer { display: flex; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .return-check-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    color: var(--text2); transition: color .2s; user-select: none;
+  }
+  .return-check-label:hover { color: var(--text); }
+  .return-check-label input[type="checkbox"] { display: none; }
+  .return-check-box {
+    width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0;
+    border: 2px solid var(--border2); background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+  }
+  .return-check-label input:checked ~ .return-check-box {
+    background: var(--danger); border-color: var(--danger);
+  }
+  .return-check-label input:checked ~ .return-check-box::after {
+    content: ''; width: 8px; height: 5px;
+    border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translateY(-1px); display: block;
+  }
+  .return-check-label input:checked ~ .return-check-text { color: var(--danger); }
 
   .empty-state {
     text-align: center; padding: 60px 20px;
@@ -383,6 +410,7 @@
   .status-btn.active-all { background: rgba(138,154,181,0.15); border-color: var(--text2); color: var(--text); }
   .status-btn.active-received { background: rgba(0,229,160,0.15); border-color: var(--accent); color: var(--accent); }
   .status-btn.active-pending { background: rgba(251,191,36,0.12); border-color: var(--warn); color: var(--warn); }
+  .status-btn.active-devpendente { background: rgba(255,77,109,0.12); border-color: var(--danger); color: var(--danger); }
 
   .dash-table-wrap { overflow-x: auto; }
   table {
@@ -421,6 +449,8 @@
   .status-dot.ok::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
   .status-dot.pending { color: var(--warn); }
   .status-dot.pending::before { background: var(--warn); }
+  .status-dot.returned { color: var(--danger); }
+  .status-dot.returned::before { background: var(--danger); }
 
   /* ── TOAST ── */
   #toast {
@@ -528,6 +558,10 @@
       <span class="num" id="cnt-pending">—</span>
       <span class="lbl">Pendentes</span>
     </div>
+    <div class="stat-pill" style="--c:var(--danger)">
+      <span class="num" id="cnt-returned" style="color:var(--danger)">—</span>
+      <span class="lbl">Devolvidos</span>
+    </div>
     <div class="stat-pill blue">
       <span class="num" id="cnt-total">—</span>
       <span class="lbl">Total</span>
@@ -595,6 +629,7 @@
           <button class="status-btn active-all" id="sbtn-all" onclick="setStatusFilter('all')">Todos</button>
           <button class="status-btn" id="sbtn-received" onclick="setStatusFilter('received')">✓ Receberam</button>
           <button class="status-btn" id="sbtn-pending" onclick="setStatusFilter('pending')">⏳ Pendentes</button>
+          <button class="status-btn" id="sbtn-devpendente" onclick="setStatusFilter('devpendente')">↩ Pendentes devolução</button>
         </div>
       </div>
     </div>
@@ -645,14 +680,16 @@ async function sbFetch(path, method = 'GET', body = null, extra = '') {
 // ── CONTADORES ────────────────────────────────────────────
 async function atualizarContadores() {
   try {
-    const todos = await sbFetch('delegados?select=id,aparelho');
+    const todos = await sbFetch('delegados?select=id,aparelho,devolvido');
     const total = todos.length;
     const recebidos = todos.filter(d => d.aparelho).length;
     const pendentes = total - recebidos;
+    const devolvidos = todos.filter(d => d.devolvido).length;
 
     document.getElementById('cnt-total').textContent = total;
     document.getElementById('cnt-received').textContent = recebidos;
     document.getElementById('cnt-pending').textContent = pendentes;
+    document.getElementById('cnt-returned').textContent = devolvidos;
 
     const pct = total > 0 ? Math.round((recebidos / total) * 100) : 0;
     document.getElementById('progress-pct').textContent = pct + '%';
@@ -675,13 +712,17 @@ async function buscarDelegado() {
 
   try {
     const apenasNumeros = q.replace(/\D/g, '');
-    const parece_cpf = apenasNumeros.length >= 3 && /^[\d\.\-]+$/.test(q);
-    let resultados = [];
-    if (parece_cpf) {
-      resultados = await sbFetch(`delegados?select=*&cpf=ilike.*${encodeURIComponent(apenasNumeros)}*&order=nome.asc`);
-    } else {
-      resultados = await sbFetch(`delegados?select=*&nome=ilike.*${encodeURIComponent(q)}*&order=nome.asc`);
-    }
+    // Busca sempre nos três campos: nome, CPF (só dígitos) e aparelho
+    const [porNomeCpf, porAparelho] = await Promise.all([
+      sbFetch(`delegados?select=*&or=(nome.ilike.*${encodeURIComponent(q)}*,cpf.ilike.*${encodeURIComponent(apenasNumeros || q)}*)&order=nome.asc`),
+      sbFetch(`delegados?select=*&aparelho=ilike.*${encodeURIComponent(q)}*&order=nome.asc`)
+    ]);
+    // Mescla sem duplicatas
+    const vistos = new Set();
+    const resultados = [...porNomeCpf, ...porAparelho].filter(d => {
+      if (vistos.has(d.id)) return false;
+      vistos.add(d.id); return true;
+    });
     renderResultados(resultados);
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><p>Erro na busca: ${e.message}</p></div>`;
@@ -697,14 +738,24 @@ function renderResultados(lista) {
     return;
   }
   container.innerHTML = `<div class="results-grid">${lista.map(d => `
-    <div class="delegate-card${d.aparelho ? ' has-device' : ''}" onclick="abrirModal('${d.id}')">
+    <div class="delegate-card${d.aparelho ? ' has-device' : ''}${d.devolvido ? ' returned' : ''}" onclick="abrirModal('${d.id}')">
       <div class="card-name">${escapeHtml(d.nome)}</div>
       <div class="card-cpf">${escapeHtml(d.cpf)}</div>
       <div class="card-tags">
         <span class="tag tag-cat">${escapeHtml(d.categoria)}</span>
         <span class="tag tag-state">${escapeHtml(d.estado)}</span>
-        ${d.aparelho ? `<span class="tag tag-ok">✓ Aparelho: ${escapeHtml(d.aparelho)}</span>` : `<span class="tag tag-pending">⏳ Pendente</span>`}
+        ${d.aparelho ? `<span class="tag tag-ok">✓ ${escapeHtml(d.aparelho)}</span>` : `<span class="tag tag-pending">⏳ Pendente</span>`}
+        ${d.devolvido ? `<span class="tag tag-returned">↩ Devolvido</span>` : ''}
       </div>
+      ${d.aparelho ? `
+      <div class="card-footer">
+        <label class="return-check-label" onclick="event.stopPropagation()">
+          <input type="checkbox" ${d.devolvido ? 'checked' : ''}
+            onchange="toggleDevolucao('${d.id}', this.checked, this)">
+          <span class="return-check-box"></span>
+          <span class="return-check-text">Aparelho devolvido</span>
+        </label>
+      </div>` : ''}
     </div>`).join('')}</div>`;
 }
 
@@ -833,6 +884,40 @@ async function salvarDados() {
   }
 }
 
+async function toggleDevolucao(id, novoEstado, checkbox) {
+  checkbox.disabled = true;
+  try {
+    await sbFetch(
+      `delegados?id=eq.${id}`,
+      'PATCH',
+      { devolvido: novoEstado, devolvido_em: novoEstado ? new Date().toISOString() : null },
+      ''
+    );
+    // Atualiza borda lateral e tag no card
+    const card = checkbox.closest('.delegate-card');
+    if (card) {
+      card.classList.toggle('returned', novoEstado);
+      let tagRet = card.querySelector('.tag-returned');
+      if (novoEstado && !tagRet) {
+        const tagWrap = card.querySelector('.card-tags');
+        const span = document.createElement('span');
+        span.className = 'tag tag-returned';
+        span.textContent = '↩ Devolvido';
+        tagWrap.appendChild(span);
+      } else if (!novoEstado && tagRet) {
+        tagRet.remove();
+      }
+    }
+    atualizarContadores();
+    showToast(novoEstado ? '↩ Devolução registrada!' : '✓ Devolução desfeita', 'success');
+  } catch(e) {
+    showToast('Erro: ' + e.message, 'error');
+    checkbox.checked = !novoEstado; // reverte o checkbox se falhar
+  } finally {
+    checkbox.disabled = false;
+  }
+}
+
 function fecharModal() {
   document.getElementById('modal-overlay').classList.remove('open');
   delegadoAtual = null;
@@ -892,8 +977,9 @@ async function carregarPainel() {
 
     let data = await sbFetch(path);
 
-    if (statusFilter === 'received') data = data.filter(d => d.aparelho);
-    if (statusFilter === 'pending') data = data.filter(d => !d.aparelho);
+    if (statusFilter === 'received')    data = data.filter(d => d.aparelho);
+    if (statusFilter === 'pending')     data = data.filter(d => !d.aparelho);
+    if (statusFilter === 'devpendente') data = data.filter(d => d.aparelho && !d.devolvido);
 
     if (!data.length) {
       el.innerHTML = `<div class="empty-state"><p>Nenhum delegado encontrado com esses filtros.</p></div>`;
@@ -909,6 +995,7 @@ async function carregarPainel() {
         <th>Aparelho</th>
         <th>Entregue em</th>
         <th>Status</th>
+        <th>Devolução</th>
       </tr></thead>
       <tbody>${data.map(d => `<tr>
         <td class="td-name">${escapeHtml(d.nome)}</td>
@@ -920,6 +1007,9 @@ async function carregarPainel() {
         <td>${d.aparelho
           ? '<span class="status-dot ok">Recebeu</span>'
           : '<span class="status-dot pending">Pendente</span>'}</td>
+        <td>${d.devolvido
+          ? '<span class="status-dot returned">Devolvido</span>'
+          : '<span style="color:var(--text3)">—</span>'}</td>
       </tr>`).join('')}</tbody>
     </table>`;
   } catch(e) {
@@ -930,9 +1020,10 @@ async function carregarPainel() {
 function setStatusFilter(val) {
   statusFilter = val;
   document.querySelectorAll('.status-btn').forEach(b => b.className = 'status-btn');
-  if (val === 'all') document.getElementById('sbtn-all').classList.add('active-all');
-  if (val === 'received') document.getElementById('sbtn-received').classList.add('active-received');
-  if (val === 'pending') document.getElementById('sbtn-pending').classList.add('active-pending');
+  if (val === 'all')         document.getElementById('sbtn-all').classList.add('active-all');
+  if (val === 'received')    document.getElementById('sbtn-received').classList.add('active-received');
+  if (val === 'pending')     document.getElementById('sbtn-pending').classList.add('active-pending');
+  if (val === 'devpendente') document.getElementById('sbtn-devpendente').classList.add('active-devpendente');
   carregarPainel();
 }
 
