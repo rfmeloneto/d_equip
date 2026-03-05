@@ -671,6 +671,7 @@ async function buscarDelegado() {
 
   const container = document.getElementById('search-results');
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando…</div>';
+  atualizarContadores();
 
   try {
     const apenasNumeros = q.replace(/\D/g, '');
@@ -762,7 +763,7 @@ async function abrirModal(id) {
       body.innerHTML = `
         <div class="modal-field">
           <label>Número do aparelho</label>
-          <input type="text" id="input-aparelho" placeholder="Ex: 123" autofocus>
+          <input type="text" id="input-aparelho" placeholder="Ex: VOT-0042" autofocus>
         </div>
         <div class="modal-actions">
           <button class="btn-confirm" onclick="registrarEntrega()">Confirmar Entrega</button>
@@ -941,6 +942,7 @@ function mostrarTela(tela) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('screen-' + tela).classList.add('active');
   document.getElementById('tab-' + tela).classList.add('active');
+  atualizarContadores();
   if (tela === 'painel') { carregarPainel(); }
 }
 
