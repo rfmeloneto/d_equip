@@ -250,6 +250,8 @@
     max-width: 420px;
     box-shadow: var(--shadow);
     animation: slideUp .25s ease;
+    max-height: 90vh;
+    overflow-y: auto;
   }
   @keyframes slideUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -313,6 +315,40 @@
     color: var(--accent); font-weight: 600; font-size: 0.9rem;
     margin-bottom: 16px;
   }
+
+  .edit-section { margin-top: 20px; }
+  .edit-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 16px;
+  }
+  .edit-divider span {
+    font-size: 0.72rem; font-weight: 600; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
+  }
+  .edit-divider::before, .edit-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .edit-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .edit-field { flex: 1; }
+  .edit-field label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+  .edit-field input {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border2); border-radius: var(--radius);
+    color: var(--text); font-family: 'Sora', sans-serif;
+    font-size: 0.88rem; padding: 10px 12px; outline: none;
+    transition: border-color .2s;
+  }
+  .edit-field input:focus { border-color: var(--primary); }
+  .btn-save-data {
+    width: 100%; background: var(--surface2); color: var(--text2);
+    border: 1px solid var(--border2); border-radius: var(--radius);
+    padding: 10px; font-family: 'Sora', sans-serif;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    transition: all .2s; display: flex; align-items: center;
+    justify-content: center; gap: 7px;
+  }
+  .btn-save-data:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-save-data:disabled { opacity: 0.5; cursor: not-allowed; }
 
   /* ── DASHBOARD SCREEN ── */
   .dashboard-filters {
@@ -700,22 +736,99 @@ async function abrirModal(id) {
         <div class="modal-actions">
           <button class="btn-confirm" onclick="registrarEntrega()">Atualizar</button>
           <button class="btn-cancel" onclick="fecharModal()">Fechar</button>
+        </div>
+        <div class="edit-section">
+          <div class="edit-divider"><span>Editar dados</span></div>
+          <div class="edit-row">
+            <div class="edit-field">
+              <label>CPF</label>
+              <input type="text" id="edit-cpf" value="${escapeHtml(d.cpf)}" placeholder="000.000.000-00">
+            </div>
+            <div class="edit-field">
+              <label>Categoria</label>
+              <select id="edit-categoria" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:'Sora',sans-serif;font-size:0.88rem;padding:10px 12px;outline:none;cursor:pointer;transition:border-color .2s;">
+                <option value="Empregador" ${d.categoria==='Empregador'?'selected':''}>Empregador</option>
+                <option value="Trabalhador" ${d.categoria==='Trabalhador'?'selected':''}>Trabalhador</option>
+                <option value="Governo" ${d.categoria==='Governo'?'selected':''}>Governo</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-save-data" onclick="salvarDados()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Salvar CPF e Categoria
+          </button>
         </div>`;
     } else {
       body.innerHTML = `
         <div class="modal-field">
           <label>Número do aparelho</label>
-          <input type="text" id="input-aparelho" placeholder="Ex: VOT-0042" autofocus>
+          <input type="text" id="input-aparelho" placeholder="Ex: 123" autofocus>
         </div>
         <div class="modal-actions">
           <button class="btn-confirm" onclick="registrarEntrega()">Confirmar Entrega</button>
           <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+        </div>
+        <div class="edit-section">
+          <div class="edit-divider"><span>Editar dados</span></div>
+          <div class="edit-row">
+            <div class="edit-field">
+              <label>CPF</label>
+              <input type="text" id="edit-cpf" value="${escapeHtml(d.cpf)}" placeholder="000.000.000-00">
+            </div>
+            <div class="edit-field">
+              <label>Categoria</label>
+              <select id="edit-categoria" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius);color:var(--text);font-family:'Sora',sans-serif;font-size:0.88rem;padding:10px 12px;outline:none;cursor:pointer;transition:border-color .2s;">
+                <option value="Empregador" ${d.categoria==='Empregador'?'selected':''}>Empregador</option>
+                <option value="Trabalhador" ${d.categoria==='Trabalhador'?'selected':''}>Trabalhador</option>
+                <option value="Governo" ${d.categoria==='Governo'?'selected':''}>Governo</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-save-data" onclick="salvarDados()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Salvar CPF e Categoria
+          </button>
         </div>`;
     }
 
     document.getElementById('modal-overlay').classList.add('open');
   } catch(e) {
     showToast('Erro ao carregar delegado', 'error');
+  }
+}
+
+async function salvarDados() {
+  const cpf       = document.getElementById('edit-cpf').value.trim();
+  const categoria = document.getElementById('edit-categoria').value.trim();
+  if (!cpf || !categoria) { showToast('Preencha CPF e Categoria', 'error'); return; }
+
+  const btn = document.querySelector('.btn-save-data');
+  btn.disabled = true; btn.innerHTML = 'Salvando…';
+
+  try {
+    const id = delegadoAtual.id;
+    const nome = delegadoAtual.nome.split(' ')[0];
+    await sbFetch(
+      `delegados?id=eq.${id}`,
+      'PATCH',
+      { cpf, categoria },
+      ''
+    );
+    delegadoAtual.cpf = cpf;
+    delegadoAtual.categoria = categoria;
+    // Atualiza o info-box no modal
+    document.getElementById('modal-info').innerHTML = `
+      <div class="info-row"><span class="info-label">Nome</span><span class="info-value">${escapeHtml(delegadoAtual.nome)}</span></div>
+      <div class="info-row"><span class="info-label">CPF</span><span class="info-value" style="font-family:'JetBrains Mono',monospace">${escapeHtml(cpf)}</span></div>
+      <div class="info-row"><span class="info-label">Categoria</span><span class="info-value">${escapeHtml(categoria)}</span></div>
+      <div class="info-row"><span class="info-label">Estado</span><span class="info-value">${escapeHtml(delegadoAtual.estado)}</span></div>`;
+    showToast(`✓ Dados de ${nome} atualizados!`, 'success');
+    buscarDelegado();
+  } catch(e) {
+    showToast('Erro ao salvar: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Salvar CPF e Categoria`;
   }
 }
 
