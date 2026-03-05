@@ -637,26 +637,14 @@ async function buscarDelegado() {
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Buscando…</div>';
 
   try {
-    // Busca por nome (ilike) ou CPF (ilike)
-    const cpfClean = q.replace(/\D/g, '');
-    let query = '';
-    if (cpfClean.length >= 3) {
-      query = `delegados?select=*&or=(nome.ilike.*${encodeURIComponent(q)}*,cpf.ilike.*${encodeURIComponent(q)}*)`;
+    const apenasNumeros = q.replace(/\D/g, '');
+    const parece_cpf = apenasNumeros.length >= 3 && /^[\d\.\-]+$/.test(q);
+    let resultados = [];
+    if (parece_cpf) {
+      resultados = await sbFetch(`delegados?select=*&cpf=ilike.*${encodeURIComponent(apenasNumeros)}*&order=nome.asc`);
     } else {
-      query = `delegados?select=*&nome=ilike.*${encodeURIComponent(q)}*`;
+      resultados = await sbFetch(`delegados?select=*&nome=ilike.*${encodeURIComponent(q)}*&order=nome.asc`);
     }
-
-    const data = await sbFetch(query.replace('sbFetch/', ''), 'GET', null, '');
-    // fallback: buscar de ambas
-    const porNome = await sbFetch(`delegados?select=*&nome=ilike.*${encodeURIComponent(q)}*`);
-    const porCPF = await sbFetch(`delegados?select=*&cpf=ilike.*${encodeURIComponent(q.replace(/\D/g,''))}*`);
-
-    const vistos = new Set();
-    const resultados = [...porNome, ...porCPF].filter(d => {
-      if (vistos.has(d.id)) return false;
-      vistos.add(d.id); return true;
-    });
-
     renderResultados(resultados);
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><p>Erro na busca: ${e.message}</p></div>`;
@@ -744,14 +732,16 @@ async function registrarEntrega() {
   btn.disabled = true; btn.textContent = 'Salvando…';
 
   try {
+    const id = delegadoAtual.id;
+    const primeiroNome = delegadoAtual.nome.split(' ')[0];
     await sbFetch(
-      `delegados?id=eq.${delegadoAtual.id}`,
+      `delegados?id=eq.${id}`,
       'PATCH',
       { aparelho: num, recebeu_em: new Date().toISOString() },
       ''
     );
     fecharModal();
-    showToast(`✓ Aparelho ${num} registrado para ${delegadoAtual.nome.split(' ')[0]}!`, 'success');
+    showToast(`✓ Aparelho ${num} registrado para ${primeiroNome}!`, 'success');
     atualizarContadores();
     buscarDelegado();
   } catch(e) {
